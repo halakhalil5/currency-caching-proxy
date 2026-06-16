@@ -10,7 +10,6 @@ def get(key):
     value, timestamp = entry
     if time.time() - timestamp < TTL:
         return value
-    del _cache[key]
     return None
 
 def set_value(key, value):
@@ -23,3 +22,10 @@ def get_age(key):
         return None
     _, timestamp = entry
     return time.time() - timestamp
+
+def get_stale(key):
+    entry = _cache.get(key)
+    if entry is None:
+        return None
+    value, _ = entry
+    return value
