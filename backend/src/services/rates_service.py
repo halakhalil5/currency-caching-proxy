@@ -3,7 +3,7 @@ from fastapi import HTTPException
 import time
 import asyncio
 from config import MAX_RETRIES, BACKOFF, TIMEOUT
-
+from metrics import record_hit, record_miss, record_error
 from config import UPSTREAM_URL, TIMEOUT
 from clients.cache_client import get, set_value, get_age, get_stale
 
@@ -15,6 +15,7 @@ async def get_rate(base: str, target: str):
     if cached is not None:
         age = get_age(key)
         elapsed_ms = (time.perf_counter() - start) * 1000
+        record_hit(elapsed_ms)
         print(f"HIT  {key}  ({elapsed_ms:.2f} ms)")
         print(f"Cache age: {age} seconds")
         return {"base": base, "target": target, "rate": cached}
@@ -42,12 +43,14 @@ async def fetch_rate(base: str, target: str, start: float, key: str):
                 set_value(key, rate)
                 age = get_age(key)
                 elapsed_ms = (time.perf_counter() - start) * 1000
+                record_miss(key, elapsed_ms)
                 print(f"FRESH {key}  ({elapsed_ms:.2f} ms)")
                 print(f"Cache age: {age} seconds")
                 return {"base": base, "target": target, "rate": rate}
         except (httpx.RequestError, httpx.HTTPStatusError) as e:
             print(f"attempt {attempt} failed: {e}")
             if attempt == MAX_RETRIES:
+                record_error()
                 stale = get_stale(key)
                 if stale is not None:
                     elapsed_ms = (time.perf_counter() - start) * 1000
