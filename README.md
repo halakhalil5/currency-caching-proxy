@@ -1,15 +1,13 @@
 # 💱 Currency Caching Proxy
 
+![CI](https://github.com/halakhalil5/currency-caching-proxy/actions/workflows/ci.yml/badge.svg)
+
 A resilient, observable caching proxy for live currency exchange rates, built with **FastAPI** and **Redis**. It sits between clients and a public exchange-rate API, caching responses to cut latency and upstream load, retrying transient failures, and degrading gracefully — serving slightly stale data rather than an error — when the upstream is unreachable.
 
-**Live demo:** `https://halahk-currency-caching-proxy.hf.space/docs`
-
- `https://halahk-currency-caching-proxy.hf.space/rates?base=USD&target=EGP`
-
-
- `https://halahk-currency-caching-proxy.hf.space/stats`
-
-
+**Live demo:**
+- Interactive docs — `https://halahk-currency-caching-proxy.hf.space/docs`
+- Example rate — `https://halahk-currency-caching-proxy.hf.space/rates?base=USD&target=EGP`
+- Live metrics — `https://halahk-currency-caching-proxy.hf.space/stats`
 
 ---
 
@@ -31,6 +29,7 @@ Calling a third-party exchange-rate API on every request is slow and wasteful: t
 - 📊 **Observability** — a `/stats` endpoint with live hit rate, average latency, error count, and per-pair last-refresh timestamps.
 - 🧱 **Clean layered architecture** — routes → controllers → services → clients, with strict separation of concerns.
 - 🔌 **Pluggable cache backend** — Redis lives behind a thin client, so swapping the storage engine touches one file.
+- ✅ **Tested & CI** — a pytest suite (with mocked Redis and upstream) runs automatically on every push via GitHub Actions.
 - 🐳 **Dockerized** and deployed to a public URL.
 
 ---
@@ -76,14 +75,16 @@ request → check cache (fresh?)
 
 ## Tech Stack
 
-| Concern        | Choice |
-|----------------|--------|
-| Web framework  | FastAPI |
-| HTTP client    | httpx (async) |
-| Cache          | Redis |
+| Concern          | Choice |
+|------------------|--------|
+| Web framework    | FastAPI |
+| HTTP client      | httpx (async) |
+| Cache            | Redis |
 | Containerization | Docker + Docker Compose |
-| Hosting        | Hugging Face Spaces (Docker SDK) |
-| Managed Redis  | Upstash (serverless, free tier) |
+| Hosting          | Hugging Face Spaces (Docker SDK) |
+| Managed Redis    | Upstash (serverless, free tier) |
+| Tests            | pytest + respx |
+| CI               | GitHub Actions |
 
 ---
 
@@ -100,11 +101,14 @@ request → check cache (fresh?)
 │   ├── cache_client.py  # Redis wrapper: get / set_value / get_age / get_stale
 │   └── upstream_client.py
 ├── metrics.py           # hit/miss/error counters for /stats
+├── tests/               # pytest suite (health, cache, resilience)
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .dockerignore
-└── .gitignore
+├── .gitignore
+└── .github/workflows/
+    └── ci.yml           # CI pipeline: runs the tests on every push
 ```
 
 ---
@@ -157,6 +161,16 @@ uvicorn main:app --reload
 ```
 
 With no `REDIS_URL` set, the app defaults to `redis://localhost:6379`. Then open `http://localhost:8000/docs`.
+
+### Running the tests
+
+From the folder that contains `main.py`:
+
+```bash
+python -m pytest -v
+```
+
+The tests mock the cache and the upstream, so they need neither a live Redis nor a live network.
 
 ---
 
@@ -276,14 +290,23 @@ Why Redis, and why it's still RAM: Redis is an in-memory store (sub-millisecond,
 ### Stage 6 — Dockerize + Deploy ✅
 The app was packaged with a Dockerfile and a docker-compose that runs the app and Redis together locally. Configuration moved fully into environment variables. The Redis connection was unified to a single `REDIS_URL` (`redis.from_url`) so the same code works locally and against cloud Redis. Deployed to **Hugging Face Spaces** (Docker SDK, port 7860) with Redis hosted on **Upstash**, and secrets set in the Space settings.
 
-### Stage 7 — Tests + CI ⏳
-Planned: a small automated test suite (cache hit, stale fallback, status codes) and a GitHub Actions workflow to run it on every push.
+### Stage 7 — Tests + CI ✅
+A **pytest** suite of 5 tests run through FastAPI's `TestClient`: `/health`, a cache hit, a cache miss, an unknown currency (404), and the stale-while-error fallback. The cache is mocked with `monkeypatch` and the upstream with **respx** (including an `httpx.ConnectError` side-effect to simulate an outage); `asyncio.sleep` is patched to a no-op so the retry backoff doesn't slow the suite. A **GitHub Actions** workflow (`.github/workflows/ci.yml`) runs all five tests on every push and pull request.
+
+```
+tests/test_health.py::test_health PASSED
+tests/test_rates.py::test_cache_hit PASSED
+tests/test_rates.py::test_cache_miss PASSED
+tests/test_rates.py::test_unknown_currency PASSED
+tests/test_rates.py::test_stale_fallback PASSED
+===================== 5 passed =====================
+```
 
 ---
 
 ## Roadmap
 
-- [ ] Automated tests (pytest) and CI (GitHub Actions)
+- [x] Automated tests (pytest) and CI (GitHub Actions)
 - [ ] Optional stats dashboard (small frontend reading `/stats`)
 - [ ] Semantic / multi-pair batch endpoints
 
