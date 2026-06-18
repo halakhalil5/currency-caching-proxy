@@ -1,11 +1,9 @@
 import time
-from config import TTL
+from config import REDIS_URL, TTL ,REDIS_HOST, REDIS_PORT
 import json
 import redis
-from config import TTL, REDIS_HOST, REDIS_PORT
 
-r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
-
+r = redis.from_url(REDIS_URL, decode_responses=True)
 # this commented section was the simple in-memory cache implementation. It was replaced with Redis for better performance and scalability.
 # _cache = {}
 
