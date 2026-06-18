@@ -1,3 +1,13 @@
+
+---
+title: Currency Caching Proxy
+emoji: 💱
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
 # 💱 Currency Caching Proxy
 
 ![CI](https://github.com/halakhalil5/currency-caching-proxy/actions/workflows/ci.yml/badge.svg)
