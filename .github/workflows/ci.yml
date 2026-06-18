@@ -1,40 +1,43 @@
-name: CI
+name: CI/CD
 
-on:
-  push:
-  pull_request:
+on: [push, pull_request]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    services:
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-
     env:
       UPSTREAM_URL: https://open.er-api.com/v6/latest
       REDIS_URL: redis://localhost:6379
       TTL: "60"
       MAX_RETRIES: "5"
       BACKOFF: "1"
-
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-
       - name: Install dependencies
         working-directory: backend/src
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest respx
-
+        run: pip install -r requirements.txt pytest respx
       - name: Run tests
         working-directory: backend/src
         run: python -m pytest -v
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          cd backend/src
+          git init
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add .
+          git commit -m "Deploy from CI"
+          git branch -M main
+          git push --force https://halahk:$HF_TOKEN@huggingface.co/spaces/halahk/currency-caching-proxy main
