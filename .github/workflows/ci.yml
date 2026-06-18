@@ -1,0 +1,29 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      UPSTREAM_URL: https://open.er-api.com/v6/latest
+      REDIS_URL: redis://localhost:6379
+      TTL: "60"
+      MAX_RETRIES: "5"
+      BACKOFF: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        working-directory: backend/src
+        run: pip install -r requirements.txt pytest respx
+
+      - name: Run tests
+        working-directory: backend/src
+        run: python -m pytest -v
